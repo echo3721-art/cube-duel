@@ -144,4 +144,6 @@ setInterval(() => {
   }
 }, 1000 / 60);
 
-server.listen(3000, () => console.log("✅ Server on http://localhost:3000"));
+// Listen on dynamic port (for Railway) or fallback to 3000 locally
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`✅ Server on http://localhost:${PORT}`));
