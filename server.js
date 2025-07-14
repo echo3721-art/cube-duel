@@ -7,15 +7,18 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// ✅ Serve static files from "public" directory
 app.use(express.static(path.join(__dirname, "public")));
+
+// 健康检查，防止容器被判死机
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
 
 const rooms = {};
 
-// ✅ ... [all your existing game logic unchanged] ...
-// --- I didn't change anything inside your socket handlers or game logic ---
+// 你原来的游戏逻辑保持不变，这里省略...
 
-// ✅ Game loop to update player positions
+// 例：更新玩家位置和状态
 setInterval(() => {
   for (let code in rooms) {
     const room = rooms[code];
@@ -32,8 +35,7 @@ setInterval(() => {
   }
 }, 1000 / 60);
 
-// ✅ Dynamic PORT for Railway or other hosts
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
