@@ -5,7 +5,82 @@
     <title>Cube Duel</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
-      /* [unchanged CSS] */
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: Arial, sans-serif;
+        background: #1a1a1a;
+      }
+      #game-container {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+      }
+      #gameCanvas {
+        display: block;
+        background: #000;
+      }
+      #ui {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        color: white;
+        background: rgba(0, 0, 0, 0.5);
+        padding: 10px;
+        border-radius: 5px;
+      }
+      #status {
+        padding: 5px 10px;
+        border-radius: 3px;
+        margin-bottom: 10px;
+        font-weight: bold;
+      }
+      .connected { background: #2ecc71; }
+      .disconnected { background: #e74c3c; }
+      button, input {
+        margin: 5px 0;
+        padding: 5px 10px;
+        cursor: pointer;
+      }
+      #roomInput {
+        width: 50px;
+        text-align: center;
+      }
+      #overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        font-size: 3em;
+        visibility: hidden;
+      }
+      #overlay button {
+        font-size: 0.5em;
+        padding: 10px 20px;
+      }
+      #cooldownBar {
+        width: 100%;
+        height: 4px;
+        background: #333;
+        margin-top: 5px;
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      #cooldownProgress {
+        height: 100%;
+        width: 100%;
+        background: #e74c3c;
+        transform-origin: left;
+        transform: scaleX(0);
+        transition: transform 0.1s linear;
+      }
     </style>
   </head>
   <body>
@@ -171,8 +246,11 @@
         ids.forEach((id) => {
           const p = players[id];
           if (!p) return;
+
           p.x += p.knockback?.x || 0;
           p.y += p.knockback?.y || 0;
+
+          // Smooth knockback decay
           if (p.knockback) {
             p.knockback.x *= 0.9;
             p.knockback.y *= 0.9;
