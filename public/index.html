@@ -7,18 +7,26 @@
     <style>
       body {
         margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
         overflow: hidden;
         font-family: Arial, sans-serif;
-        background: #1a1a1a;
+        background: #20e5fa;
       }
       #game-container {
         position: relative;
-        width: 100vw;
-        height: 100vh;
+        width: 100%;
+        height: 100%;
       }
-      #gameCanvas {
+      canvas {
         display: block;
-        background: #000;
+        width: 100%;
+        height: 100%;
+        background: #5edcff;
       }
       #ui {
         position: absolute;
@@ -42,10 +50,43 @@
         padding: 5px 10px;
         cursor: pointer;
       }
-      #roomInput {
-        width: 50px;
+      #ui input[type="text"] {
+        width: 80px;
+        padding: 4px;
+        border-radius: 4px;
+        border: 1px solid #555;
+        background: #222;
+        color: #fff;
         text-align: center;
       }
+      #ui button {
+        padding: 6px 12px;
+        border: none;
+        border-radius: 4px;
+        background: #2980b9;
+        color: #fff;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      #ui button:hover {
+        background: #1f618d;
+      }
+      #ui button:disabled {
+        background: #555;
+        cursor: not-allowed;
+      }
+      #kickBtn {
+        background: #c0392b;
+      }
+      #kickBtn:hover {
+        background: #922b21;
+      }
+      #startBtn,
+      #kickBtn,
+      #roomDisplay {
+        display: none;
+      }
+
       #overlay {
         position: fixed;
         top: 0;
@@ -55,10 +96,11 @@
         background: rgba(0, 0, 0, 0.8);
         display: flex;
         flex-direction: column;
-        justify-content: center;
         align-items: center;
-        color: white;
-        font-size: 3em;
+        justify-content: center;
+        color: #fff;
+        font-size: 1.5rem;
+        z-index: 20;
         visibility: hidden;
       }
       #overlay button {
@@ -255,6 +297,7 @@
             p.knockback.x *= 0.9;
             p.knockback.y *= 0.9;
           }
+          //draw cube
           ctx.fillStyle = p.color;
           ctx.fillRect(p.x, p.y, 50, 50);
         });
@@ -287,6 +330,7 @@
               opponent.health -= 10;
               opponent.knockback.x += Math.cos(angle) * 3;
               opponent.knockback.y += Math.sin(angle) * 3;
+
               if (opponent.health <= 0) {
                 gameEnded = true;
                 message.textContent = "You Win!";
