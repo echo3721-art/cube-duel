@@ -1,20 +1,20 @@
-# Use Node.js image
-FROM node:18
+# Use a lightweight Node.js image
+FROM node:20-alpine
 
-# Create app folder
+# Create app directory
 WORKDIR /app
 
-# Copy dependencies
+# Copy package files first (better caching)
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install only production dependencies
+RUN npm install --omit=dev
 
-# Copy everything else
+# Copy the rest of the project
 COPY . .
 
-# Expose port (match Railway port)
+# Expose the port your server uses
 EXPOSE 8080
 
-# Start the app
+# Start the server
 CMD ["node", "server.js"]
