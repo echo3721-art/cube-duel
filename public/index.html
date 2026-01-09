@@ -2,10 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Cube Duel - Voice Edition</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cube Duel - Voice Edition (Mobile)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <style>
-      body { margin: 0; padding: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #20e5fa; }
+      /* Added touch-action: none to prevent scrolling on mobile */
+      body { margin: 0; padding: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #20e5fa; touch-action: none; user-select: none; -webkit-user-select: none; }
       #game-container { position: relative; width: 100vw; height: 100vh; }
       canvas { display: block; width: 100%; height: 100%; background: #5edcff; }
       
@@ -13,6 +14,7 @@
         position: absolute; top: 10px; left: 10px; color: white;
         background: rgba(0, 0, 0, 0.7); padding: 15px; border-radius: 8px;
         backdrop-filter: blur(5px); z-index: 10;
+        max-width: 300px;
       }
       #status { padding: 5px 10px; border-radius: 3px; margin-bottom: 10px; font-weight: bold; text-align: center; }
       .connected { background: #2ecc71; }
@@ -33,8 +35,68 @@
       }
       #overlay h1 { font-size: 3rem; margin-bottom: 20px; }
       
-      /* Hidden container for remote audio streams */
       #remote-audio-container { display: none; }
+
+      /* --- Mobile Controls CSS --- */
+      #mobile-controls {
+        display: none; /* Hidden on desktop by default */
+        position: absolute;
+        bottom: 20px;
+        left: 0;
+        width: 100%;
+        height: 150px;
+        z-index: 20;
+        pointer-events: none; /* Let clicks pass through empty spaces */
+      }
+
+      .joystick-zone {
+        position: absolute;
+        bottom: 20px;
+        width: 120px;
+        height: 120px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        pointer-events: auto;
+      }
+
+      #stick-left { left: 30px; }
+      #stick-right { right: 30px; }
+
+      .knob {
+        position: absolute;
+        top: 50%; left: 50%;
+        width: 50px; height: 50px;
+        background: rgba(255, 255, 255, 0.5);
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+        transition: 0.1s;
+      }
+
+      #fire-btn {
+        position: absolute;
+        bottom: 160px;
+        right: 30px;
+        width: 80px;
+        height: 80px;
+        background: rgba(255, 71, 87, 0.6);
+        border: 2px solid white;
+        border-radius: 50%;
+        color: white;
+        font-weight: bold;
+        font-size: 1.2rem;
+        display: flex; align-items: center; justify-content: center;
+        pointer-events: auto;
+        user-select: none;
+      }
+      #fire-btn:active { background: rgba(255, 71, 87, 0.9); transform: scale(0.95); }
+
+      /* Mobile styling adjustments */
+      @media (max-width: 768px) {
+        #ui { max-width: 200px; font-size: 0.8rem; top: 0; left: 0; border-radius: 0; }
+        #mobile-controls { display: block; } /* Show controls on mobile */
+      }
     </style>
   </head>
   <body>
@@ -50,14 +112,14 @@
         </div>
 
         <div id="setup-controls">
-          <button id="hostBtn">Host New Room</button>
+          <button id="hostBtn">Host Room</button>
           <hr style="width:100%; border: 0.5px solid #444;">
-          <input type="text" id="roomInput" placeholder="Enter 4-digit code" maxlength="4" />
+          <input type="text" id="roomInput" placeholder="Enter Code" maxlength="4" />
           <button id="joinBtn">Join Room</button>
         </div>
 
         <div id="lobby-controls" style="display:none;">
-          <p>Room Code: <strong id="roomCodeDisplay">----</strong></p>
+          <p>Code: <strong id="roomCodeDisplay">----</strong></p>
           <button id="startBtn" style="display:none;">Start Battle</button>
           <button id="kickBtn" style="display:none;">Kick Opponent</button>
         </div>
@@ -66,6 +128,16 @@
       <div id="overlay">
         <h1 id="message">GAME OVER</h1>
         <button onclick="location.reload()">Back to Menu</button>
+      </div>
+
+      <div id="mobile-controls">
+        <div id="stick-left" class="joystick-zone">
+            <div class="knob"></div>
+        </div>
+        <div id="stick-right" class="joystick-zone">
+            <div class="knob"></div>
+        </div>
+        <div id="fire-btn">FIRE</div>
       </div>
     </div>
 
@@ -84,7 +156,6 @@
       let roomCode = null;
       let players = {};
       let isHost = false;
-      let mousePos = { x: 0, y: 0 };
 
       // Voice Chat State
       let localStream;
@@ -95,7 +166,6 @@
       const menuMusic = document.getElementById('menuMusic');
       const fightMusic = document.getElementById('fightMusic');
 
-      // Resize logic
       function resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -116,20 +186,14 @@
       function createPeerConnection(targetId) {
         const pc = new RTCPeerConnection(iceConfig);
         peers[targetId] = pc;
-
-        // Add local tracks to the connection
         if (localStream) {
           localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
         }
-
-        // Send ICE candidates to the other player
         pc.onicecandidate = (event) => {
           if (event.candidate) {
             socket.emit('ice-candidate', { candidate: event.candidate, to: targetId, code: roomCode });
           }
         };
-
-        // When remote audio arrives, play it
         pc.ontrack = (event) => {
           let audio = document.getElementById(`audio-${targetId}`);
           if (!audio) {
@@ -140,7 +204,6 @@
           }
           audio.srcObject = event.streams[0];
         };
-
         return pc;
       }
 
@@ -190,7 +253,6 @@
             startBtn.style.display = 'block';
             document.getElementById('kickBtn').style.display = 'block';
         } else {
-            // If we are the one joining, tell the host we are ready to connect voice
             socket.emit('readyForVoice', { code: roomCode });
         }
       });
@@ -199,7 +261,6 @@
         players = serverPlayers;
       });
 
-      // Music Change logic
       socket.on('startBattle', () => {
         menuMusic.pause();
         menuMusic.currentTime = 0;
@@ -215,7 +276,6 @@
         msg.style.color = data.winner === myId ? "#2ecc71" : "#e74c3c";
       });
 
-      /* --- WebRTC Signaling Events --- */
       socket.on('playerJoinedVoice', async (id) => {
         const pc = createPeerConnection(id);
         const offer = await pc.createOffer();
@@ -243,7 +303,7 @@
         }
       });
 
-      /* --- Input Handling --- */
+      /* --- PC Input Handling --- */
       window.addEventListener('keydown', (e) => {
         socket.emit('keydown', { key: e.key.toLowerCase(), code: roomCode });
       });
@@ -265,11 +325,104 @@
         socket.emit('attack', { code: roomCode });
       });
 
+      /* --- Mobile Input Logic --- */
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      if(isMobile) {
+        // Prevent context menu on long press
+        window.oncontextmenu = function(event) { event.preventDefault(); event.stopPropagation(); return false; };
+
+        // Joystick Setup
+        const setupJoystick = (elementId, callback) => {
+            const zone = document.getElementById(elementId);
+            const knob = zone.querySelector('.knob');
+            const maxRadius = 35; // How far the knob can go
+
+            let startX, startY;
+
+            zone.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.changedTouches[0];
+                startX = touch.clientX;
+                startY = touch.clientY;
+            });
+
+            zone.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                const touch = e.changedTouches[0];
+                let dx = touch.clientX - startX;
+                let dy = touch.clientY - startY;
+
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance > maxRadius) {
+                    const angle = Math.atan2(dy, dx);
+                    dx = Math.cos(angle) * maxRadius;
+                    dy = Math.sin(angle) * maxRadius;
+                }
+
+                knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                
+                // Normalized vectors (-1 to 1)
+                callback(dx / maxRadius, dy / maxRadius);
+            });
+
+            const reset = () => {
+                knob.style.transform = `translate(-50%, -50%)`;
+                callback(0, 0); // Stop
+            };
+
+            zone.addEventListener('touchend', reset);
+            zone.addEventListener('touchcancel', reset);
+        };
+
+        // Left Joystick (Movement) - Translates to WSAD keys
+        const activeKeys = { w: false, a: false, s: false, d: false };
+        
+        setupJoystick('stick-left', (x, y) => {
+            if(!roomCode) return;
+            
+            const threshold = 0.3;
+            const newKeys = {
+                w: y < -threshold,
+                s: y > threshold,
+                a: x < -threshold,
+                d: x > threshold
+            };
+
+            // Detect changes and emit keydown/keyup events
+            for (const key in newKeys) {
+                if (newKeys[key] && !activeKeys[key]) {
+                    socket.emit('keydown', { key, code: roomCode });
+                    activeKeys[key] = true;
+                } else if (!newKeys[key] && activeKeys[key]) {
+                    socket.emit('keyup', { key, code: roomCode });
+                    activeKeys[key] = false;
+                }
+            }
+        });
+
+        // Right Joystick (Aiming) - Emits Angle
+        setupJoystick('stick-right', (x, y) => {
+            if(!roomCode) return;
+            if(Math.abs(x) < 0.1 && Math.abs(y) < 0.1) return; // Deadzone
+            
+            const angle = Math.atan2(y, x);
+            socket.emit('aim', { code: roomCode, angle });
+        });
+
+        // Fire Button
+        const fireBtn = document.getElementById('fire-btn');
+        fireBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if(roomCode) socket.emit('attack', { code: roomCode });
+        });
+      }
+
       /* --- Render Loop --- */
       function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Draw basic grid
+        // Grid
         ctx.strokeStyle = "rgba(255,255,255,0.1)";
         for(let i=0; i<canvas.width; i+=50) {
             ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i, canvas.height); ctx.stroke();
@@ -287,7 +440,7 @@
           ctx.fillRect(10, 5, 10, 10);
           ctx.restore();
 
-          // Health Bar
+          // Health
           ctx.fillStyle = "#333";
           ctx.fillRect(p.x, p.y - 15, 50, 6);
           ctx.fillStyle = p.health > 30 ? "#2ecc71" : "#e74c3c";
